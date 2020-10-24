@@ -5,6 +5,7 @@ from nltk.stem import PorterStemmer
 import os
 import sys
 import math
+import numpy as np
 
 def extractParas(text):
 	paragraphs = []
@@ -80,8 +81,47 @@ if __name__ == '__main__':
 				else:
 					inverted_index[word] = [i]
 
-	print(inverted_index)
+	# print(len(inverted_index))
+
+	doclen = [] #length of the docs
+	totcount = 0
+	for doc in documents:
+		totcount = 0
+		for para in doc:
+			totcount += len(para)
+		doclen.append(totcount)
+
+	tf_idf = {}
+	for word in vocab:
+		for i,doc in enumerate(documents):
+			if i in inverted_index[word]:
+				for para in doc:
+					for w in para:
+						if(w == word):
+							count+=1
+				# count/=doclen[i]
+			else:
+				count = 0
+
+			if (i != 0):
+				tf_idf[word].append(count)
+			else:
+				tf_idf[word] = [count]
+			count = 0
+	#tf_idf currently stores only tf values for words in dictionary format
+
+	#convert to 1 + log(tf)
+	for word in vocab:
+		tf_idf[word] = [(1 + math.log(x+1)) for x in tf_idf[word]]
+
+	#add idf weighting
+	totaldocs = len(documents)
+	for word in vocab:
+		idfval = math.log(totaldocs/len(inverted_index[word]))
+		tf_idf[word] = [round(x * idfval, 3) for x in tf_idf[word]]
+
+	
+	# print(tf_idf["inherit"]) #to check whether index is properly created
 
 	#take testfile name from cl arguments
 	# testDocument = str(sys.argv[1])
-
