@@ -6,6 +6,7 @@ import os
 import sys
 import math
 import numpy as np
+#ensure you have Python 3.6+
 
 def extractParas(text):
 	paragraphs = []
@@ -48,9 +49,11 @@ def stemmer(tokens):
 
 if __name__ == '__main__':
 	documents=[]
+	filename = {}
 	vocab = set()
 	files = os.listdir('TRAIN')
 	for i,file in enumerate(files):
+		filename[i] = file
 		with open('TRAIN/' + file, encoding="utf8", errors='ignore') as f:
 			data = f.read()
 			paras = extractParas(data)
@@ -123,5 +126,43 @@ if __name__ == '__main__':
 	
 	# print(tf_idf["inherit"]) #to check whether index is properly created
 
+
 	#take testfile name from cl arguments
-	# testDocument = str(sys.argv[1])
+	testDocument = str(sys.argv[1])
+
+	with open(testDocument, encoding="utf8", errors="ignore") as input_file:
+		testdata = input_file.read()
+
+	#process test document
+	paras = extractParas(testdata)
+	testparagraphs = []
+	for j, para in enumerate(paras):
+		###preprocessing###
+		tokens = tokenize(para)
+		stoplesstokens = stopwordRemoval(tokens)
+		finaltokens = stemmer(stoplesstokens)
+		###
+		testparagraphs.append(finaltokens)
+
+
+	ranking = {} #dictionary to store doc number and score
+
+	for i,doc in enumerate(documents):
+		ranking[i] = 0
+		for j,para in enumerate(testparagraphs):
+			for word in para:
+				ranking[i] += tf_idf[word][i]
+		ranking[i] = round(ranking[i],3)
+	
+	#sort ranking dict in reverse order by keys
+	ranking = {k: v for k, v in sorted(ranking.items(),reverse=True, key=lambda item: item[1])}
+
+	#print top 10 matching documents
+	print("\nTop 10 documents matching the given test document in ranked order are: ")
+	print("Rank","	-	","Doc No", "	-	","Doc Name","		-	","Score")
+	cnt = 0
+	for i in ranking:
+		cnt += 1
+		print(cnt,"	-	",i, "		-	",filename[i],"	-	",ranking[i])
+		if(cnt>10):
+			break
