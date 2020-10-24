@@ -3,6 +3,8 @@ from nltk.tokenize import RegexpTokenizer
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
 import os
+import sys
+import math
 
 def extractParas(text):
 	paragraphs = []
@@ -45,18 +47,41 @@ def stemmer(tokens):
 
 if __name__ == '__main__':
 	documents=[]
+	vocab = set()
 	files = os.listdir('TRAIN')
 	for i,file in enumerate(files):
 		with open('TRAIN/' + file, encoding="utf8", errors='ignore') as f:
 			data = f.read()
 			paras = extractParas(data)
 			paragraphs = []
-			for para in paras:
+			for j,para in enumerate(paras):
 				###preprocessing###
 				tokens = tokenize(para)
 				stoplesstokens = stopwordRemoval(tokens)
-				finalpara = stemmer(stoplesstokens)
+				finaltokens = stemmer(stoplesstokens)
 				###
-				paragraphs.append(finalpara)
+				paragraphs.append(finaltokens)
+				for term in finaltokens:
+					vocab.add(term)
 			documents.append(paragraphs)
-	
+	vocablen = len(vocab)
+
+	#creating the inverted index
+	# indexer = Indexer(documents)
+
+	inverted_index = {}
+	for i,doc in enumerate(documents):
+		for j, para in enumerate(doc):
+			for word in para:
+				# print(word)
+				if inverted_index.get(word,False):
+					if i not in inverted_index[word]:
+						inverted_index[word].append(i)
+				else:
+					inverted_index[word] = [i]
+
+	print(inverted_index)
+
+	#take testfile name from cl arguments
+	# testDocument = str(sys.argv[1])
+
