@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
 <meta name="generator" content="pdoc 0.9.1" />
-<title>Plagiarism Checker.main API documentation</title>
+<title>Plagiarism-Checker.main API documentation</title>
 <meta name="description" content="" />
 <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/sanitize.min.css" integrity="sha256-PK9q560IAAa6WVRRh76LtCaI8pjTJ2z11v0miyNNjrs=" crossorigin>
 <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/typography.min.css" integrity="sha256-7l/o7C8jubJiy74VsKTidCy1yBkRtiUGbVkYBylBqUg=" crossorigin>
@@ -19,7 +19,7 @@
 <main>
 <article id="content">
 <header>
-<h1 class="title">Module <code>Plagiarism Checker.main</code></h1>
+<h1 class="title">Module <code>Plagiarism-Checker.main</code></h1>
 </header>
 <section id="section-intro">
 <details class="source">
@@ -185,12 +185,12 @@ def calculate_TfIdf_Weights(vocab, inverted_index, documents):
         return tf_idf
 
 
-def rankDocsBySimilarity(documents, testparagraphs, tf_idf):
+def rankDocsByMatchingSimilarity(documents, testparagraphs, tf_idf):
         &#34;&#34;&#34;
-        Calculate the ranking of the docs wrt similarity to testdoc 
+        Calculate the ranking of the docs wrt matching similarity to testdoc 
 
         Parameters:  
-        (arg1)documents(set): Preprocessed list containing content of the documents  
+        (arg1)documents(list): Preprocessed list containing content of the documents  
         (arg2)testparagraphs(list): paragraphs extracted from test document  
         (arg3)tf_idf(dict): TfIdf scores  
         &amp;nbsp;&amp;nbsp; Key: word  
@@ -214,6 +214,131 @@ def rankDocsBySimilarity(documents, testparagraphs, tf_idf):
         #sort ranking dict in reverse order by keys
         ranking = {k: v for k, v in sorted(ranking.items(),reverse=True, key=lambda item: item[1])}
         return ranking
+
+
+def calculateQueryWeights(testvocab, inverted_index, testparagraphs, totaldocs):
+        &#34;&#34;&#34;
+        Calculate weight of the query passed - here query is a document 
+
+        Parameters:  
+        arg1: testvocab(set): Preprocessed list containing content of the documents  
+        arg2: inverted_index(dict): Inverted Index  
+        arg3: testparagraphs(list): paragraphs extracted from test document  
+        arg4: totaldocs(int): Number of documents in Training corpus  
+
+        Returns:  
+        weights(dictionary)  
+        &amp;nbsp;&amp;nbsp; Key: word in test document vocabulary  
+        &amp;nbsp;&amp;nbsp; Value: TfIdf score  
+        &#34;&#34;&#34;
+        weights = {}
+        
+        for word in testvocab:
+                count = 0
+                for para in testparagraphs:
+                        for w in para:
+                                if(w == word):
+                                        count += 1
+                weights[word] = count
+
+        for word in testvocab:
+                weights[word] = 1 + math.log(weights[word]+1)
+
+        
+        for word in testvocab:
+                if word not in inverted_index:
+                        inverted_index[word] = []
+                        tf_idf[word] = [0]*totaldocs
+                idfval = math.log((totaldocs+1)/(len(inverted_index[word])+1))
+                
+                weights[word] = round(weights[word] * idfval, 3)
+
+        return weights
+
+def calculateParaWeights(para, vocab, inverted_index, totaldocs):
+        &#34;&#34;&#34;
+        Calculate weight of the query passed - here query is a paragraph 
+
+        Parameters:  
+        arg1: para(list): List of tokens in the query paragraph  
+        arg2: testvocab(set): Preprocessed list containing content of the documents  
+        arg3: inverted_index(dict): Inverted Index  
+        arg4: totaldocs(int): Number of documents in Training corpus  
+
+        Returns:  
+        weights(numpy array) - contains weights of the words in the test para vocabulary for the passed para    
+        &#34;&#34;&#34;
+
+        weights = np.zeros(len(vocab))
+        for i,word in enumerate(vocab):
+                count = 0
+                for w in para:
+                        if(w == word):
+                                count += 1
+                weights[i] = count
+
+                for i in range(len(vocab)):
+                        if(weights[i] != 0):
+                                weights[i] = 1 + math.log(weights[i]+1)
+
+                for i,word in enumerate(vocab):
+                        if word not in inverted_index:
+                                inverted_index[word] = []
+                                tf_idf[word] = [0]*totaldocs
+                        idfval = math.log((totaldocs+1)/(len(inverted_index[word])+1))
+                        weights[i] = round(weights[i] * idfval, 3)
+        return weights
+
+
+def rankDocsByCosineSimilarity(documents, testparagraphs, tf_idf, inverted_index):
+        ranking = {}
+        testvocab = set()
+        for para in testparagraphs:
+                for word in para:
+                        testvocab.add(word)
+        testdoc = []
+        testdoc.append(testparagraphs)
+        query_tfidf = calculateQueryWeights(testvocab, inverted_index, testparagraphs, len(documents))
+        a = np.zeros(len(testvocab))
+        b = np.zeros(len(testvocab))
+
+        # print(query_tfidf)
+        
+        for j,doc in enumerate(documents):
+                i = 0
+                for word in testvocab:
+                        if word in inverted_index and j in inverted_index[word]:
+                                a[i] = tf_idf[word][j]
+                        else:
+                                a[i] = 0
+                        b[i] = query_tfidf[word]
+                        i += 1
+                ranking[j] = cosine_sim(a,b)
+
+        #sort ranking dict in reverse order by keys
+        ranking = {k: v for k, v in sorted(ranking.items(),reverse = True, key=lambda item: item[1])}
+        # print(ranking)
+        return ranking
+
+
+def cosine_sim(a,b):
+        &#34;&#34;&#34;
+        Calculate cosine of two vectors
+        
+        Parameters:  
+        arg1: a(list) - 1st vector
+        arg2: b(list) - 2nd vector
+
+        Return:
+        cos_sim(float) - Computed cosine
+        &#34;&#34;&#34;
+
+        cos_sim = 0
+        if np.linalg.norm(a)!=0 and np.linalg.norm(b)!=0:
+                cos_sim = np.dot(a, b)/(np.linalg.norm(a)*np.linalg.norm(b))
+        return cos_sim
+
+
 
 
 if __name__ == &#39;__main__&#39;:
@@ -273,22 +398,49 @@ if __name__ == &#39;__main__&#39;:
                 finaltokens = stemmer(stoplesstokens)
                 ###
                 testparagraphs.append(finaltokens)
-
-
-
-        ranking = rankDocsBySimilarity(documents, testparagraphs, tf_idf)
+        
+        # print(len(testparagraphs), testparagraphs)
+        
         
 
+        # ranking = rankDocsByMatchingSimilarity(documents, testparagraphs, tf_idf)
+        # Use when Matching Similarity is to be used to rank docs
+
+        ranking = rankDocsByCosineSimilarity(documents, testparagraphs, tf_idf, inverted_index)
 
         #print top 10 matching documents
         print(&#34;\nTop 10 documents matching the given test document in ranked order are: &#34;)
-        print(&#34;Rank&#34;,&#34;  -       &#34;,&#34;Doc No&#34;, &#34;   -       &#34;,&#34;Doc Name&#34;,&#34;          -       &#34;,&#34;Score&#34;)
+        print(&#34;Rank&#34;,&#34;  -       &#34;,&#34;Doc No&#34;, &#34;   -       &#34;,&#34;Doc Name&#34;,&#34;          -       &#34;,&#34;Cosine Score&#34;)
         cnt = 0
         for i in ranking:
                 cnt += 1
                 print(cnt,&#34;     -       &#34;,i, &#34;          -       &#34;,filename[i],&#34; -       &#34;,ranking[i])
                 if(cnt&gt;10):
-                        break</code></pre>
+                        break
+
+        #para as a query part
+        print(&#34;\n&#34;)
+        
+        totaldocs = len(documents)
+        totalmatches = 0
+        for k, tpara in enumerate(testparagraphs):
+                testparavocab = set()
+                for term in tpara:
+                        testparavocab.add(term)
+                testparaweights = calculateParaWeights(tpara, testparavocab, inverted_index, totaldocs)
+                matchfound = 0
+                for i,doc in enumerate(documents):
+                        for j,para in enumerate(doc):
+                                paraweights = calculateParaWeights(para, testparavocab, inverted_index, totaldocs)
+                                cos_sim = cosine_sim(testparaweights, paraweights)
+                                if(cos_sim &gt; 0.95):
+                                        matchfound = 1
+                                        totalmatches += 1
+                                        print(&#34;Paragraph &#34;,k,&#34; from test document matches with paragraph &#34;,j,&#34; from document &#34;,i,&#34; - &#34;,filename[i])
+                                        break
+                        if(matchfound == 1):
+                                break
+        print(&#34;Document uniqueness = &#34;, round(100 - (totalmatches*100/len(testparagraphs)), 2),&#34;%&#34;)</code></pre>
 </details>
 </section>
 <section>
@@ -298,7 +450,118 @@ if __name__ == &#39;__main__&#39;:
 <section>
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
-<dt id="Plagiarism Checker.main.calculate_TfIdf_Weights"><code class="name flex">
+<dt id="Plagiarism-Checker.main.calculateParaWeights"><code class="name flex">
+<span>def <span class="ident">calculateParaWeights</span></span>(<span>para, vocab, inverted_index, totaldocs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Calculate weight of the query passed - here query is a paragraph </p>
+<p>Parameters:<br>
+arg1: para(list): List of tokens in the query paragraph<br>
+arg2: testvocab(set): Preprocessed list containing content of the documents<br>
+arg3: inverted_index(dict): Inverted Index<br>
+arg4: totaldocs(int): Number of documents in Training corpus
+</p>
+<p>Returns:<br>
+weights(numpy array) - contains weights of the words in the test para vocabulary for the passed para</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def calculateParaWeights(para, vocab, inverted_index, totaldocs):
+        &#34;&#34;&#34;
+        Calculate weight of the query passed - here query is a paragraph 
+
+        Parameters:  
+        arg1: para(list): List of tokens in the query paragraph  
+        arg2: testvocab(set): Preprocessed list containing content of the documents  
+        arg3: inverted_index(dict): Inverted Index  
+        arg4: totaldocs(int): Number of documents in Training corpus  
+
+        Returns:  
+        weights(numpy array) - contains weights of the words in the test para vocabulary for the passed para    
+        &#34;&#34;&#34;
+
+        weights = np.zeros(len(vocab))
+        for i,word in enumerate(vocab):
+                count = 0
+                for w in para:
+                        if(w == word):
+                                count += 1
+                weights[i] = count
+
+                for i in range(len(vocab)):
+                        if(weights[i] != 0):
+                                weights[i] = 1 + math.log(weights[i]+1)
+
+                for i,word in enumerate(vocab):
+                        if word not in inverted_index:
+                                inverted_index[word] = []
+                                tf_idf[word] = [0]*totaldocs
+                        idfval = math.log((totaldocs+1)/(len(inverted_index[word])+1))
+                        weights[i] = round(weights[i] * idfval, 3)
+        return weights</code></pre>
+</details>
+</dd>
+<dt id="Plagiarism-Checker.main.calculateQueryWeights"><code class="name flex">
+<span>def <span class="ident">calculateQueryWeights</span></span>(<span>testvocab, inverted_index, testparagraphs, totaldocs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Calculate weight of the query passed - here query is a document </p>
+<p>Parameters:<br>
+arg1: testvocab(set): Preprocessed list containing content of the documents<br>
+arg2: inverted_index(dict): Inverted Index<br>
+arg3: testparagraphs(list): paragraphs extracted from test document<br>
+arg4: totaldocs(int): Number of documents in Training corpus
+</p>
+<p>Returns:<br>
+weights(dictionary)<br>
+&nbsp;&nbsp; Key: word in test document vocabulary<br>
+&nbsp;&nbsp; Value: TfIdf score</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def calculateQueryWeights(testvocab, inverted_index, testparagraphs, totaldocs):
+        &#34;&#34;&#34;
+        Calculate weight of the query passed - here query is a document 
+
+        Parameters:  
+        arg1: testvocab(set): Preprocessed list containing content of the documents  
+        arg2: inverted_index(dict): Inverted Index  
+        arg3: testparagraphs(list): paragraphs extracted from test document  
+        arg4: totaldocs(int): Number of documents in Training corpus  
+
+        Returns:  
+        weights(dictionary)  
+        &amp;nbsp;&amp;nbsp; Key: word in test document vocabulary  
+        &amp;nbsp;&amp;nbsp; Value: TfIdf score  
+        &#34;&#34;&#34;
+        weights = {}
+        
+        for word in testvocab:
+                count = 0
+                for para in testparagraphs:
+                        for w in para:
+                                if(w == word):
+                                        count += 1
+                weights[word] = count
+
+        for word in testvocab:
+                weights[word] = 1 + math.log(weights[word]+1)
+
+        
+        for word in testvocab:
+                if word not in inverted_index:
+                        inverted_index[word] = []
+                        tf_idf[word] = [0]*totaldocs
+                idfval = math.log((totaldocs+1)/(len(inverted_index[word])+1))
+                
+                weights[word] = round(weights[word] * idfval, 3)
+
+        return weights</code></pre>
+</details>
+</dd>
+<dt id="Plagiarism-Checker.main.calculate_TfIdf_Weights"><code class="name flex">
 <span>def <span class="ident">calculate_TfIdf_Weights</span></span>(<span>vocab, inverted_index, documents)</span>
 </code></dt>
 <dd>
@@ -363,7 +626,39 @@ Dictionary: TfIdf scores<br>
         return tf_idf</code></pre>
 </details>
 </dd>
-<dt id="Plagiarism Checker.main.createInvertedIndex"><code class="name flex">
+<dt id="Plagiarism-Checker.main.cosine_sim"><code class="name flex">
+<span>def <span class="ident">cosine_sim</span></span>(<span>a, b)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Calculate cosine of two vectors</p>
+<p>Parameters:<br>
+arg1: a(list) - 1st vector
+arg2: b(list) - 2nd vector</p>
+<p>Return:
+cos_sim(float) - Computed cosine</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def cosine_sim(a,b):
+        &#34;&#34;&#34;
+        Calculate cosine of two vectors
+        
+        Parameters:  
+        arg1: a(list) - 1st vector
+        arg2: b(list) - 2nd vector
+
+        Return:
+        cos_sim(float) - Computed cosine
+        &#34;&#34;&#34;
+
+        cos_sim = 0
+        if np.linalg.norm(a)!=0 and np.linalg.norm(b)!=0:
+                cos_sim = np.dot(a, b)/(np.linalg.norm(a)*np.linalg.norm(b))
+        return cos_sim</code></pre>
+</details>
+</dd>
+<dt id="Plagiarism-Checker.main.createInvertedIndex"><code class="name flex">
 <span>def <span class="ident">createInvertedIndex</span></span>(<span>documents)</span>
 </code></dt>
 <dd>
@@ -405,7 +700,7 @@ Dictionary: The inverted index<br>
         return inverted_index</code></pre>
 </details>
 </dd>
-<dt id="Plagiarism Checker.main.extractParas"><code class="name flex">
+<dt id="Plagiarism-Checker.main.extractParas"><code class="name flex">
 <span>def <span class="ident">extractParas</span></span>(<span>text)</span>
 </code></dt>
 <dd>
@@ -447,13 +742,53 @@ list: List of paragraphs from the input document</p></div>
         return paragraphs</code></pre>
 </details>
 </dd>
-<dt id="Plagiarism Checker.main.rankDocsBySimilarity"><code class="name flex">
-<span>def <span class="ident">rankDocsBySimilarity</span></span>(<span>documents, testparagraphs, tf_idf)</span>
+<dt id="Plagiarism-Checker.main.rankDocsByCosineSimilarity"><code class="name flex">
+<span>def <span class="ident">rankDocsByCosineSimilarity</span></span>(<span>documents, testparagraphs, tf_idf, inverted_index)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Calculate the ranking of the docs wrt similarity to testdoc </p>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def rankDocsByCosineSimilarity(documents, testparagraphs, tf_idf, inverted_index):
+        ranking = {}
+        testvocab = set()
+        for para in testparagraphs:
+                for word in para:
+                        testvocab.add(word)
+        testdoc = []
+        testdoc.append(testparagraphs)
+        query_tfidf = calculateQueryWeights(testvocab, inverted_index, testparagraphs, len(documents))
+        a = np.zeros(len(testvocab))
+        b = np.zeros(len(testvocab))
+
+        # print(query_tfidf)
+        
+        for j,doc in enumerate(documents):
+                i = 0
+                for word in testvocab:
+                        if word in inverted_index and j in inverted_index[word]:
+                                a[i] = tf_idf[word][j]
+                        else:
+                                a[i] = 0
+                        b[i] = query_tfidf[word]
+                        i += 1
+                ranking[j] = cosine_sim(a,b)
+
+        #sort ranking dict in reverse order by keys
+        ranking = {k: v for k, v in sorted(ranking.items(),reverse = True, key=lambda item: item[1])}
+        # print(ranking)
+        return ranking</code></pre>
+</details>
+</dd>
+<dt id="Plagiarism-Checker.main.rankDocsByMatchingSimilarity"><code class="name flex">
+<span>def <span class="ident">rankDocsByMatchingSimilarity</span></span>(<span>documents, testparagraphs, tf_idf)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Calculate the ranking of the docs wrt matching similarity to testdoc </p>
 <p>Parameters:<br>
-(arg1)documents(set): Preprocessed list containing content of the documents<br>
+(arg1)documents(list): Preprocessed list containing content of the documents<br>
 (arg2)testparagraphs(list): paragraphs extracted from test document<br>
 (arg3)tf_idf(dict): TfIdf scores<br>
 &nbsp;&nbsp; Key: word<br>
@@ -467,12 +802,12 @@ Dictionary: Ranking<br>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def rankDocsBySimilarity(documents, testparagraphs, tf_idf):
+<pre><code class="python">def rankDocsByMatchingSimilarity(documents, testparagraphs, tf_idf):
         &#34;&#34;&#34;
-        Calculate the ranking of the docs wrt similarity to testdoc 
+        Calculate the ranking of the docs wrt matching similarity to testdoc 
 
         Parameters:  
-        (arg1)documents(set): Preprocessed list containing content of the documents  
+        (arg1)documents(list): Preprocessed list containing content of the documents  
         (arg2)testparagraphs(list): paragraphs extracted from test document  
         (arg3)tf_idf(dict): TfIdf scores  
         &amp;nbsp;&amp;nbsp; Key: word  
@@ -498,7 +833,7 @@ Dictionary: Ranking<br>
         return ranking</code></pre>
 </details>
 </dd>
-<dt id="Plagiarism Checker.main.stemmer"><code class="name flex">
+<dt id="Plagiarism-Checker.main.stemmer"><code class="name flex">
 <span>def <span class="ident">stemmer</span></span>(<span>tokens)</span>
 </code></dt>
 <dd>
@@ -528,7 +863,7 @@ list: List of stemmed tokens</p></div>
         return tokens</code></pre>
 </details>
 </dd>
-<dt id="Plagiarism Checker.main.stopwordRemoval"><code class="name flex">
+<dt id="Plagiarism-Checker.main.stopwordRemoval"><code class="name flex">
 <span>def <span class="ident">stopwordRemoval</span></span>(<span>tokens)</span>
 </code></dt>
 <dd>
@@ -558,7 +893,7 @@ list: List of tokens without the stop words</p></div>
         return tokens</code></pre>
 </details>
 </dd>
-<dt id="Plagiarism Checker.main.tokenize"><code class="name flex">
+<dt id="Plagiarism-Checker.main.tokenize"><code class="name flex">
 <span>def <span class="ident">tokenize</span></span>(<span>text)</span>
 </code></dt>
 <dd>
@@ -605,18 +940,22 @@ list: List of tokens from the input paragraph</p></div>
 <ul id="index">
 <li><h3>Super-module</h3>
 <ul>
-<li><code><a title="Plagiarism Checker" href="index.html">Plagiarism Checker</a></code></li>
+<li><code><a title="Plagiarism-Checker" href="index.html">Plagiarism-Checker</a></code></li>
 </ul>
 </li>
 <li><h3><a href="#header-functions">Functions</a></h3>
 <ul class="">
-<li><code><a title="Plagiarism Checker.main.calculate_TfIdf_Weights" href="#Plagiarism Checker.main.calculate_TfIdf_Weights">calculate_TfIdf_Weights</a></code></li>
-<li><code><a title="Plagiarism Checker.main.createInvertedIndex" href="#Plagiarism Checker.main.createInvertedIndex">createInvertedIndex</a></code></li>
-<li><code><a title="Plagiarism Checker.main.extractParas" href="#Plagiarism Checker.main.extractParas">extractParas</a></code></li>
-<li><code><a title="Plagiarism Checker.main.rankDocsBySimilarity" href="#Plagiarism Checker.main.rankDocsBySimilarity">rankDocsBySimilarity</a></code></li>
-<li><code><a title="Plagiarism Checker.main.stemmer" href="#Plagiarism Checker.main.stemmer">stemmer</a></code></li>
-<li><code><a title="Plagiarism Checker.main.stopwordRemoval" href="#Plagiarism Checker.main.stopwordRemoval">stopwordRemoval</a></code></li>
-<li><code><a title="Plagiarism Checker.main.tokenize" href="#Plagiarism Checker.main.tokenize">tokenize</a></code></li>
+<li><code><a title="Plagiarism-Checker.main.calculateParaWeights" href="#Plagiarism-Checker.main.calculateParaWeights">calculateParaWeights</a></code></li>
+<li><code><a title="Plagiarism-Checker.main.calculateQueryWeights" href="#Plagiarism-Checker.main.calculateQueryWeights">calculateQueryWeights</a></code></li>
+<li><code><a title="Plagiarism-Checker.main.calculate_TfIdf_Weights" href="#Plagiarism-Checker.main.calculate_TfIdf_Weights">calculate_TfIdf_Weights</a></code></li>
+<li><code><a title="Plagiarism-Checker.main.cosine_sim" href="#Plagiarism-Checker.main.cosine_sim">cosine_sim</a></code></li>
+<li><code><a title="Plagiarism-Checker.main.createInvertedIndex" href="#Plagiarism-Checker.main.createInvertedIndex">createInvertedIndex</a></code></li>
+<li><code><a title="Plagiarism-Checker.main.extractParas" href="#Plagiarism-Checker.main.extractParas">extractParas</a></code></li>
+<li><code><a title="Plagiarism-Checker.main.rankDocsByCosineSimilarity" href="#Plagiarism-Checker.main.rankDocsByCosineSimilarity">rankDocsByCosineSimilarity</a></code></li>
+<li><code><a title="Plagiarism-Checker.main.rankDocsByMatchingSimilarity" href="#Plagiarism-Checker.main.rankDocsByMatchingSimilarity">rankDocsByMatchingSimilarity</a></code></li>
+<li><code><a title="Plagiarism-Checker.main.stemmer" href="#Plagiarism-Checker.main.stemmer">stemmer</a></code></li>
+<li><code><a title="Plagiarism-Checker.main.stopwordRemoval" href="#Plagiarism-Checker.main.stopwordRemoval">stopwordRemoval</a></code></li>
+<li><code><a title="Plagiarism-Checker.main.tokenize" href="#Plagiarism-Checker.main.tokenize">tokenize</a></code></li>
 </ul>
 </li>
 </ul>
