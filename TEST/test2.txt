@@ -1,0 +1,5 @@
+After preprocessing was done we created the inverted index in the form of a posting list. We used a dictionary to store the word and its posting list as key value pairs.
+We then proceeded to create the TfIDf scores for all the documents in the form of a dictionary which consisted of a word and associated list (length being number of documents) containing the tf*idf scores for the documents for that respective word. We used ltc.ltc format for calculating the scores.
+After that processing of the test document was done in a similar way as the training corpus. We then used the TfIDf vectors to compute both matching similarity and cosine similarity between the query doc and our corpus.
+Top 10 documents with the highest similarity score were displayed to the user. This was done by taking a test document as a query.
+Next we found from where the paragraphs were plagiarised from (if they were) and reported the same to the user displaying the doc number name and paragraph number from that particular document. At the end we simply calculated the amount of uniqueness in the document provided by the user wrt to our training corpus.

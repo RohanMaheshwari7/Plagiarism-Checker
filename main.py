@@ -6,6 +6,7 @@ import os
 import sys
 import math
 import numpy as np
+import time
 #ensure you have Python 3.6+
 
 def extractParas(text):
@@ -263,6 +264,22 @@ def calculateParaWeights(para, vocab, inverted_index, totaldocs):
 
 
 def rankDocsByCosineSimilarity(documents, testparagraphs, tf_idf, inverted_index):
+	"""
+	Calculate the ranking of the docs wrt cosine similarity to testdoc 
+
+	Parameters:  
+	arg1: documents(list): Preprocessed list containing content of the documents  
+	arg2: testparagraphs(list): paragraphs extracted from test document  
+	arg3: tf_idf(dict): TfIdf scores  
+	&nbsp;&nbsp; Key: word  
+	&nbsp;&nbsp; Value: list of tf * idf scores for all the documents  
+	arg4: inverted_index(dict): Inverted Index  
+
+	Returns:  
+	Dictionary: Ranking  
+	&nbsp;&nbsp; Key: doc number  
+	&nbsp;&nbsp; Value: Cosine Similarity score  
+	"""
 	ranking = {}
 	testvocab = set()
 	for para in testparagraphs:
@@ -314,6 +331,7 @@ def cosine_sim(a,b):
 
 
 if __name__ == '__main__':
+	start = time.time()
 	documents=[]
 	filename = {}
 	vocab = set()
@@ -347,7 +365,7 @@ if __name__ == '__main__':
 
 
 
-	inverted_index = createInvertedIndex(documents)
+	inverted_index = createInvertedIndex(documents)	
 	
 
 	tf_idf = calculate_TfIdf_Weights(vocab, inverted_index, documents)
@@ -371,7 +389,7 @@ if __name__ == '__main__':
 		###
 		testparagraphs.append(finaltokens)
 	
-	# print(len(testparagraphs), testparagraphs)
+	
 	
 	
 
@@ -387,11 +405,12 @@ if __name__ == '__main__':
 	for i in ranking:
 		cnt += 1
 		print(cnt,"	-	",i, "		-	",filename[i],"	-	",ranking[i])
-		if(cnt>10):
+		if(cnt>9):
 			break
 
 	#para as a query part
 	print("\n")
+	print("Calculating document uniqueness...")
 	
 	totaldocs = len(documents)
 	totalmatches = 0
@@ -413,3 +432,5 @@ if __name__ == '__main__':
 			if(matchfound == 1):
 				break
 	print("Document uniqueness = ", round(100 - (totalmatches*100/len(testparagraphs)), 2),"%")
+
+	print("Total time taken = ", time.time() - start, "s")
